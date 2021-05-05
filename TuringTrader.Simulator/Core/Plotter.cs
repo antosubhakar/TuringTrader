@@ -95,7 +95,7 @@ namespace TuringTrader.Simulator
         /// <summary>
         /// Create and initialize logger object.
         /// </summary>
-        public Plotter(Algorithm parentAlgorithm = null) 
+        public Plotter(Algorithm parentAlgorithm = null)
         {
             ParentAlgorithm = parentAlgorithm;
         }
@@ -295,6 +295,10 @@ namespace TuringTrader.Simulator
             /// Name of explicitly generated sheet with strategy exposure over time.
             /// </summary>
             public const string EXPOSURE_VS_TIME = "Exposure vs Time";
+            /// <summary>
+            /// Name of explicitly generated sheet with average strategy exposure.
+            /// </summary>
+            public const string EXPOSURE_AVG = "Average Exposure";
             /// <summary>
             /// Name of explicitly generated sheet with PnL vs position hold time.
             /// </summary>

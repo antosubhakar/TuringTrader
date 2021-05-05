@@ -31,19 +31,16 @@
 #region libraries
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
-using TuringTrader.BooksAndPubs;
+using TuringTrader.Algorithms.Glue;
 using TuringTrader.Indicators;
 using TuringTrader.Simulator;
-using TuringTrader.Support;
-using TuringTrader.Algorithms.Glue;
 #endregion
 
 namespace TuringTrader.BooksAndPubs
 {
     #region LAA core
-    public abstract class Keller_LAA_Core : Algorithm
+    public abstract class Keller_LAA_Core : AlgorithmPlusGlue
     {
         #region inputs
         public abstract HashSet<Tuple<string, double>> RISKY_PORTFOLIO { get; }
@@ -55,18 +52,8 @@ namespace TuringTrader.BooksAndPubs
         public static string MARKET = "$SPX";
         public static string BENCHMARK = Assets.PORTF_60_40;
         #endregion
-        #region internal data
-        private Plotter _plotter = null;
-        private AllocationTracker _alloc = new AllocationTracker();
-        #endregion
-        #region ctor
-        public Keller_LAA_Core()
-        {
-            _plotter = new Plotter(this);
-        }
-        #endregion
         #region public override void Run()
-        public override void Run()
+        public override IEnumerable<Bar> Run(DateTime? startTime, DateTime? endTime)
         {
             //========== initialization ==========
 
@@ -127,10 +114,9 @@ namespace TuringTrader.BooksAndPubs
                                 .Sum(a => a.Item2));
 
                     // submit orders
-                    _alloc.LastUpdate = SimTime[0];
                     foreach (var i in weights.Keys)
                     {
-                        _alloc.Allocation[i] = weights[i];
+                        Alloc.Allocation[i] = weights[i];
                         var shares = (int)Math.Floor(weights[i] * NetAssetValue[0] / i.Close[0]);
                         i.Trade(shares - i.Position);
                     }
@@ -141,8 +127,8 @@ namespace TuringTrader.BooksAndPubs
                 {
                     _plotter.AddNavAndBenchmark(this, FindInstrument(BENCHMARK));
                     _plotter.AddStrategyHoldings(this, universe.Select(ds => ds.Instrument));
-                    if (_alloc.LastUpdate == SimTime[0])
-                        _plotter.AddTargetAllocationRow(_alloc);
+                    if (Alloc.LastUpdate == SimTime[0])
+                        _plotter.AddTargetAllocationRow(Alloc);
 
 #if true
                     // additional plotter output
@@ -157,13 +143,19 @@ namespace TuringTrader.BooksAndPubs
                     _plotter.Plot(market.Instrument.Name + "-SMA", marketSMA[0]);
 #endif
                 }
+
+                var v = 10.0 * NetAssetValue[0] / Globals.INITIAL_CAPITAL;
+                yield return Bar.NewOHLC(
+                    this.GetType().Name, SimTime[0],
+                    v, v, v, v, 0);
             }
 
             //========== post processing ==========
 
             if (!IsOptimizing)
             {
-                _plotter.AddTargetAllocation(_alloc);
+                _plotter.AddAverageHoldings(this);
+                _plotter.AddTargetAllocation(Alloc);
                 _plotter.AddOrderLog(this);
                 _plotter.AddPositionLog(this);
                 _plotter.AddPnLHoldTime(this);
@@ -172,12 +164,6 @@ namespace TuringTrader.BooksAndPubs
             }
 
             FitnessValue = this.CalcFitness();
-        }
-        #endregion
-        #region public override void Report()
-        public override void Report()
-        {
-            _plotter.OpenWith("SimpleReport");
         }
         #endregion
     }
@@ -370,11 +356,11 @@ namespace TuringTrader.BooksAndPubs
     {
         public override string Name => "Keller's LAA: constructed World ETF (named WRLD)";
 
-        public override HashSet<Tuple<string, double>> ALLOCATION => new HashSet<Tuple<string, double>>
+        public override HashSet<Tuple<object, double>> ALLOCATION => new HashSet<Tuple<object, double>>
         {
-            Tuple.Create("SPY", 3.0 / 6.0),
-            Tuple.Create("VEA", 2.0 / 6.0),
-            Tuple.Create("VWO", 1.0 / 6.0),
+            new Tuple<object, double>("SPY", 3.0 / 6.0),
+            new Tuple<object, double>("VEA", 2.0 / 6.0),
+            new Tuple<object, double>("VWO", 1.0 / 6.0),
         };
         public override string BENCH => Assets.PORTF_60_40;
     }

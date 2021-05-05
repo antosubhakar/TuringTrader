@@ -299,7 +299,7 @@ namespace TuringTrader.Simulator
                     //if (endTime > (DateTime)LastTime)
                     //    endTime = (DateTime)LastTime;
 
-                    var cacheKey = new CacheId(null, "", 0,
+                    var cacheKey = new CacheId().AddParameters(
                         Info[DataSourceParam.nickName].GetHashCode(),
                         startTime.GetHashCode(),
                         endTime.GetHashCode());
@@ -329,7 +329,7 @@ namespace TuringTrader.Simulator
                             double value;
                             try
                             {
-                                value = double.Parse(valueString);
+                                value = double.Parse(valueString, CultureInfo.InvariantCulture);
                             }
                             catch
                             {

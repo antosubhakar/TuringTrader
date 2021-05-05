@@ -27,38 +27,28 @@
 #region libraries
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
-using TuringTrader.BooksAndPubs;
+using TuringTrader.Algorithms.Glue;
 using TuringTrader.Indicators;
 using TuringTrader.Simulator;
 using TuringTrader.Support;
-using TuringTrader.Algorithms.Glue;
 #endregion
 
 namespace TuringTrader.BooksAndPubs
 {
-    public abstract class Keller_CAA_Core : Algorithm
+    public abstract class Keller_CAA_Core : AlgorithmPlusGlue
     {
         public override string Name => "Keller's CAA Strategy";
 
         #region inputs
         protected abstract double TVOL { get; }
         protected abstract List<string> RISKY_ASSETS { get; }
-        protected abstract List<string> SAFE_ASSETS { get;  }
+        protected abstract List<string> SAFE_ASSETS { get; }
         protected virtual double MAX_RISKY_ALLOC => 0.25;
         #endregion
         #region internal data
         //private readonly string BENCHMARK = "^SPX.index";
         private readonly string BENCHMARK = Assets.PORTF_60_40;
-        private Plotter _plotter;
-        private AllocationTracker _alloc = new AllocationTracker();
-        #endregion
-        #region ctor
-        public Keller_CAA_Core()
-        {
-            _plotter = new Plotter(this);
-        }
         #endregion
 
         #region public override void Run()
@@ -118,10 +108,9 @@ namespace TuringTrader.BooksAndPubs
                     Output.WriteLine("{0:MM/dd/yyyy}: {1}", SimTime[0], pf.ToString());
 
                     // adjust all positions
-                    _alloc.LastUpdate = SimTime[0];
                     foreach (var i in pf.Weights.Keys)
                     {
-                        _alloc.Allocation[i] = pf.Weights[i];
+                        Alloc.Allocation[i] = pf.Weights[i];
 
                         int targetShares = (int)Math.Floor(NetAssetValue[0] * pf.Weights[i] / i.Close[0]);
                         int currentShares = i.Position;
@@ -142,24 +131,21 @@ namespace TuringTrader.BooksAndPubs
                 {
                     _plotter.AddNavAndBenchmark(this, FindInstrument(BENCHMARK));
                     _plotter.AddStrategyHoldings(this, universe.Select(ds => ds.Instrument));
-                    if (_alloc.LastUpdate == SimTime[0])
-                        _plotter.AddTargetAllocationRow(_alloc);
-
-                    if (IsDataSource)
-                    {
-                        var v = 10.0 * NetAssetValue[0] / Globals.INITIAL_CAPITAL;
-                        yield return Bar.NewOHLC(
-                            this.GetType().Name, SimTime[0],
-                            v, v, v, v, 0);
-                    }
+                    if (Alloc.LastUpdate == SimTime[0])
+                        _plotter.AddTargetAllocationRow(Alloc);
                 }
+
+                var v = 10.0 * NetAssetValue[0] / Globals.INITIAL_CAPITAL;
+                yield return Bar.NewOHLC(
+                    this.GetType().Name, SimTime[0],
+                    v, v, v, v, 0);
             }
 
             //========== post processing ==========
 
             if (!IsOptimizing)
             {
-                _plotter.AddTargetAllocation(_alloc);
+                _plotter.AddTargetAllocation(Alloc);
                 _plotter.AddOrderLog(this);
                 _plotter.AddPositionLog(this);
                 _plotter.AddPnLHoldTime(this);
@@ -168,12 +154,6 @@ namespace TuringTrader.BooksAndPubs
             }
 
             FitnessValue = this.CalcFitness();
-        }
-        #endregion
-        #region public override void Report()
-        public override void Report()
-        {
-            _plotter.OpenWith("SimpleReport");
         }
         #endregion
     }

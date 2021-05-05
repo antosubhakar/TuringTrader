@@ -30,18 +30,14 @@
 #region libraries
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TuringTrader.BooksAndPubs;
-using TuringTrader.Simulator;
 using TuringTrader.Algorithms.Glue;
+using TuringTrader.Simulator;
 #endregion
 
 namespace TuringTrader.BooksAndPubs
 {
-    public abstract class Keller_DAA_Core : Algorithm
+    public abstract class Keller_DAA_Core : AlgorithmPlusGlue
     {
         public override string Name => "Keller's DAA";
 
@@ -55,8 +51,6 @@ namespace TuringTrader.BooksAndPubs
         #endregion
         #region internal data
         private readonly string BENCHMARK = Assets.PORTF_60_40;
-        private Plotter _plotter;
-        private AllocationTracker _alloc = new AllocationTracker();
         #endregion
         #region internal helpers
         /// <summary>
@@ -73,15 +67,9 @@ namespace TuringTrader.BooksAndPubs
         }
 
         #endregion
-        #region ctor
-        public Keller_DAA_Core()
-        {
-            _plotter = new Plotter(this);
-        }
-        #endregion
 
         #region public override void Run()
-        public override void Run()
+        public override IEnumerable<Bar> Run(DateTime? startTime, DateTime? endTime)
         {
             //----- initialization
 
@@ -167,7 +155,6 @@ namespace TuringTrader.BooksAndPubs
                     foreach (Instrument i in topInstruments)
                         weights[i] += (1.0 - CF) / t;
 
-                    _alloc.LastUpdate = SimTime[0];
                     foreach (Instrument i in Instruments)
                     {
                         // skip instruments not in our relevant universes
@@ -180,7 +167,7 @@ namespace TuringTrader.BooksAndPubs
                         var i2 = AssetSub(i);
 
                         // calculate target allocations
-                        _alloc.Allocation[i2] = weights[i];
+                        Alloc.Allocation[i2] = weights[i];
                         int targetShares = (int)Math.Floor(weights[i] * NetAssetValue[0] / i2.Close[0]);
 
                         Order newOrder = i2.Trade(targetShares - i2.Position);
@@ -201,16 +188,21 @@ namespace TuringTrader.BooksAndPubs
                     _plotter.AddStrategyHoldings(this, Instruments
                         .Where(i => riskyUniverse.Contains(i.DataSource) || cashUniverse.Contains(i.DataSource))
                         .Select(i => AssetSub(i)));
-                    if (_alloc.LastUpdate == SimTime[0])
-                        _plotter.AddTargetAllocationRow(_alloc);
+                    if (Alloc.LastUpdate == SimTime[0])
+                        _plotter.AddTargetAllocationRow(Alloc);
                 }
+
+                var v = 10.0 * NetAssetValue[0] / Globals.INITIAL_CAPITAL;
+                yield return Bar.NewOHLC(
+                    this.GetType().Name, SimTime[0],
+                    v, v, v, v, 0);
             }
 
             //----- post processing
 
             if (!IsOptimizing)
             {
-                _plotter.AddTargetAllocation(_alloc);
+                _plotter.AddTargetAllocation(Alloc);
                 _plotter.AddOrderLog(this);
                 _plotter.AddPositionLog(this);
                 _plotter.AddPnLHoldTime(this);
@@ -219,12 +211,6 @@ namespace TuringTrader.BooksAndPubs
             }
 
             FitnessValue = this.CalcFitness();
-        }
-        #endregion
-        #region public override void Report()
-        public override void Report()
-        {
-            _plotter.OpenWith("SimpleReport");
         }
         #endregion
     }
